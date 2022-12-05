@@ -1,17 +1,19 @@
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Scanner;
+import java.util.Set;
 
-import components.map.Map;
-import components.map.Map1L;
-import components.set.Set;
-import components.set.Set1L;
-import components.simplereader.SimpleReader;
-import components.simplereader.SimpleReader1L;
-import components.simplewriter.SimpleWriter;
-import components.simplewriter.SimpleWriter1L;
-import components.sortingmachine.SortingMachine;
-import components.sortingmachine.SortingMachine4;
 import components.utilities.FormatChecker;
-import components.utilities.Reporter;
 
 /**
  * Generators an html and css tag cloud from an input text file.
@@ -20,12 +22,12 @@ import components.utilities.Reporter;
  * @author Craig Ngo
  *
  */
-public final class TagCloudGenerator {
+public final class TagCloudGeneratorJCF {
 
     /**
      * Private constructor so this utility class cannot be instantiated.
      */
-    private TagCloudGenerator() {
+    private TagCloudGeneratorJCF() {
     }
 
     /**
@@ -52,11 +54,11 @@ public final class TagCloudGenerator {
      * class. (Adapted from Queue Sort lab)
      */
     private static class StringCmp
-            implements Comparator<Map.Pair<String, Integer>> {
+            implements Comparator<Map.Entry<String, Integer>> {
         @Override
-        public int compare(Map.Pair<String, Integer> o1,
-                Map.Pair<String, Integer> o2) {
-            return o1.key().compareTo(o2.key());
+        public int compare(Map.Entry<String, Integer> o1,
+                Map.Entry<String, Integer> o2) {
+            return o1.getKey().compareTo(o2.getKey());
         }
     }
 
@@ -64,11 +66,11 @@ public final class TagCloudGenerator {
      * A class which compares two Integers using the Comparator class.
      */
     private static class IntegerCmp
-            implements Comparator<Map.Pair<String, Integer>> {
+            implements Comparator<Map.Entry<String, Integer>> {
         @Override
-        public int compare(Map.Pair<String, Integer> o1,
-                Map.Pair<String, Integer> o2) {
-            return o2.value().compareTo(o1.value());
+        public int compare(Map.Entry<String, Integer> o1,
+                Map.Entry<String, Integer> o2) {
+            return o2.getValue().compareTo(o1.getValue());
         }
     }
 
@@ -83,7 +85,7 @@ public final class TagCloudGenerator {
          * Creates an array of separator characters. Adds each element of that
          * array into a Set and returns the Set.
          */
-        Set<Character> invalid = new Set1L<>();
+        Set<Character> invalid = new HashSet<>();
         char[] separators = { '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
                 '`', '~', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '+',
                 '=', '[', ']', '{', '}', '|', '\\', ':', ';', '\"', '<', ',',
@@ -102,9 +104,10 @@ public final class TagCloudGenerator {
      * @param invalid
      *            Set of whitespace/separator characters to parse words.
      * @return Unordered Map of words and their counts.
+     * @throws IOException
      */
-    private static Map<String, Integer> countWords(SimpleReader in,
-            Set<Character> invalid) {
+    private static Map<String, Integer> countWords(BufferedReader in,
+            Set<Character> invalid) throws IOException {
         /*
          * Builds words char by char, parsing according to a set of separator
          * characters. Adds each word to a map and updates count of each word as
@@ -112,22 +115,28 @@ public final class TagCloudGenerator {
          */
 
         StringBuilder builder = new StringBuilder();
-        Map<String, Integer> m = new Map1L<>();
-        while (!in.atEOS()) {
-            char c = in.read();
-            if (!invalid.contains(c)) {
-                builder.append(c);
-            } else {
-                if (builder.length() != 0) {
-                    String word = builder.toString().toLowerCase();
-                    if (!m.hasKey(word)) {
-                        m.add(word, 1);
-                    } else {
-                        m.replaceValue(word, m.value(word) + 1);
+
+        Map<String, Integer> m = new HashMap<>();
+        String line = in.readLine();
+        while (line != null) {
+
+            for (int i = 0; i < line.length(); i++) {
+                char c = line.charAt(i);
+                if (!invalid.contains(c)) {
+                    builder.append(c);
+                } else {
+                    if (builder.length() != 0) {
+                        String word = builder.toString().toLowerCase();
+                        if (!m.containsKey(word)) {
+                            m.put(word, 1);
+                        } else {
+                            m.put(word, m.get(word) + 1);
+                        }
+                        builder.delete(0, builder.length());
                     }
-                    builder.delete(0, builder.length());
                 }
             }
+            line = in.readLine();
         }
         return m;
     }
@@ -141,13 +150,16 @@ public final class TagCloudGenerator {
      *            Name of source file.
      * @param cloudSize
      *            desired number of words in tag cloud.
+     * @throws IOException
      */
-    private static void printHeader(SimpleWriter output, String fileName,
-            int cloudSize) {
+    private static void printHeader(PrintWriter output, String fileName,
+            int cloudSize) throws IOException {
         output.println("<html>");
-        output.println("<head>");
+        output.write("<head>");
+
         output.println("<title>Top " + cloudSize + " words in " + fileName
                 + "</title>");
+
         output.println(
                 "<link href=\"http://web.cse.ohio-state.edu/software/2231/web-"
                         + "sw2/assignments/projects/tag-cloud-generator/data/"
@@ -155,11 +167,15 @@ public final class TagCloudGenerator {
                         + ">\r\n"
                         + "<link href=\"tagcloud.css\" rel=\"stylesheet\" type"
                         + "=\"text/css\">");
+
         output.println("</head>\r\n" + "<body>");
+
         output.println(
                 "<h2>Top " + cloudSize + " words in " + fileName + "</h2>");
+
         output.println(
                 "<hr>\r\n" + "<div class=\"cdiv\">\r\n" + "<p class=\"cbox\">");
+
     }
 
     /**
@@ -170,19 +186,20 @@ public final class TagCloudGenerator {
      * @param sorter
      *            Sorted collection of pairs of words and counts.
      */
-    private static void printBody(SimpleWriter output,
-            SortingMachine<Map.Pair<String, Integer>> sorter) {
+    private static void printBody(PrintWriter output,
+            Queue<Map.Entry<String, Integer>> sorter) {
 
         /*
          * Get max and min counts.
          */
         int minCount = 0;
         int maxCount = 0;
-        for (Map.Pair<String, Integer> p : sorter) {
-            if (p.value() > maxCount) {
-                maxCount = p.value();
-            } else if (p.value() < minCount) {
-                minCount = p.value();
+        for (Map.Entry<String, Integer> p : sorter) {
+            int count = p.getValue();
+            if (count > maxCount) {
+                maxCount = count;
+            } else if (count < minCount) {
+                minCount = count;
             }
         }
 
@@ -190,9 +207,9 @@ public final class TagCloudGenerator {
          * Print body
          */
         while (sorter.size() > 0) {
-            Map.Pair<String, Integer> pair = sorter.removeFirst();
+            Map.Entry<String, Integer> pair = sorter.poll();
 
-            int count = pair.value();
+            int count = pair.getValue();
             int fontSize = 1;
             /*
              * Apply font size algorithm
@@ -201,18 +218,18 @@ public final class TagCloudGenerator {
             /*
              * Adjusted max font size using font buffer.
              */
-            int adjMax = TagCloudGenerator.MAXFONT
-                    - TagCloudGenerator.FONTBUFFER;
+            int adjMax = TagCloudGeneratorJCF.MAXFONT
+                    - TagCloudGeneratorJCF.FONTBUFFER;
 
             if (count > minCount) {
                 fontSize = (adjMax * (count - minCount))
                         / (maxCount - minCount);
             }
-            fontSize += TagCloudGenerator.FONTBUFFER;
+            fontSize += TagCloudGeneratorJCF.FONTBUFFER;
 
             output.println("<span style=\"cursor:default\" class=\"f" + fontSize
-                    + "\" title=\"count:" + pair.value() + "\">" + pair.key()
-                    + "</span>");
+                    + "\" title=\"count:" + pair.getValue() + "\">"
+                    + pair.getKey() + "</span>");
         }
         output.println("</p>\n" + "</div>\n" + "</body>\n" + "</html>\n" + "");
     }
@@ -222,8 +239,9 @@ public final class TagCloudGenerator {
      *
      * @param args
      *            the command line arguments
+     * @throws IOException
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         /*
          * 1. Ask user for input file, output file, number of words N to
          * display. 2. Parse words from input file. 3. Sort parsed words by
@@ -231,46 +249,37 @@ public final class TagCloudGenerator {
          * displaying N words according to css stylehsheet.
          */
 
-        SimpleWriter out = new SimpleWriter1L();
-        SimpleReader in = new SimpleReader1L();
-        Comparator<Map.Pair<String, Integer>> strcmp = new StringCmp();
-        Comparator<Map.Pair<String, Integer>> intcmp = new IntegerCmp();
+        Scanner in = new Scanner(System.in);
+        Comparator<Map.Entry<String, Integer>> strcmp = new StringCmp();
+        Comparator<Map.Entry<String, Integer>> intcmp = new IntegerCmp();
 
         /*
          * Asks for input/output/number of words.
          */
-        out.println("Enter path to input file name:");
+        System.out.println("Enter path to input file name:");
         String input = in.nextLine();
-        out.println("Enter path to output file name:");
+        System.out.println("Enter path to output file name:");
         String output = in.nextLine();
 
-        out.println("Enter number of words to include in cloud:");
+        System.out.println("Enter number of words to include in cloud:");
         String number = in.nextLine();
-        if (FormatChecker.canParseInt(number)) {
-            int n = Integer.parseInt(number);
+
+        // TODO: REMOVE
+        input = "./test/importance.txt";
+        output = "./test/importance.html";
+        int n = 100;
+        // TODO: REMOVE
+
+        if (true || FormatChecker.canParseInt(number)) {
+//            int n = Integer.parseInt(number);
             /*
              * Checks for various invalid inputs.
              */
-            Reporter.assertElseFatalError(input.length() > 0,
-                    "Input cannot be empty.");
-            Reporter.assertElseFatalError(output.length() > 0,
-                    "Output cannot be empty.");
-            Reporter.assertElseFatalError(!input.equals(output),
-                    "Input and output files should be different.");
-            Reporter.assertElseFatalError(
-                    input.length() > DOTTXT && input
-                            .substring(input.length() - DOTTXT).equals(".txt"),
-                    "Input should be a .txt file.");
-            Reporter.assertElseFatalError(
-                    output.length() > DOTHTML
-                            && output.substring(output.length() - DOTHTML)
-                                    .equals(".html"),
-                    "Output cannot be empty.");
-            Reporter.assertElseFatalError(n > 0,
-                    "Tag cloud size must be greater than 0.");
+            BufferedReader inFile = new BufferedReader(new FileReader(input));
 
-            SimpleReader inFile = new SimpleReader1L(input);
-            SimpleWriter outFile = new SimpleWriter1L(output);
+            PrintWriter outFile = new PrintWriter(
+                    new BufferedWriter(new FileWriter(output)));
+
             /*
              * Parses words from input file after input is validated.
              */
@@ -281,41 +290,32 @@ public final class TagCloudGenerator {
              * Sorts words by count in a sorting machine. IE puts map pairs into
              * a sorting machine sorting by count.
              */
-
-            SortingMachine<Map.Pair<String, Integer>> sortByCount = new SortingMachine4<>(
+            Queue<Map.Entry<String, Integer>> sortByCount = new PriorityQueue<>(
                     intcmp);
-
-            while (words.size() > 0) {
-                sortByCount.add(words.removeAny());
-            }
-            sortByCount.changeToExtractionMode();
+            sortByCount.addAll(words.entrySet());
 
             /*
              * Sorts words by alphabet in a sorting machine. IE puts map pairs
              * into a sorting machine sorting by word.
              */
-
-            SortingMachine<Map.Pair<String, Integer>> sortByWords = new SortingMachine4<>(
+            Queue<Map.Entry<String, Integer>> sortByWords = new PriorityQueue<>(
                     strcmp);
             for (int i = 0; i < n && sortByCount.size() > 0; i++) {
-                sortByWords.add(sortByCount.removeFirst());
+                sortByWords.add(sortByCount.poll());
             }
-            sortByWords.changeToExtractionMode();
 
             /*
              * Constructs webpage.
              */
-
             printHeader(outFile, input, n);
             printBody(outFile, sortByWords);
 
             inFile.close();
             outFile.close();
         } else {
-            out.print("Not a valid integer");
+            System.out.print("Not a valid integer");
         }
 
-        out.close();
         in.close();
 
     }
