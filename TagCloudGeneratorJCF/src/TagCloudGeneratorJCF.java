@@ -264,14 +264,8 @@ public final class TagCloudGeneratorJCF {
         System.out.println("Enter number of words to include in cloud:");
         String number = in.nextLine();
 
-        // TODO: REMOVE
-        input = "./test/importance.txt";
-        output = "./test/importance.html";
-        int n = 100;
-        // TODO: REMOVE
-
         if (true || FormatChecker.canParseInt(number)) {
-//            int n = Integer.parseInt(number);
+            int n = Integer.parseInt(number);
             /*
              * Checks for various invalid inputs.
              */
