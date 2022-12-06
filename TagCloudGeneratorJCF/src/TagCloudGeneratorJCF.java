@@ -7,13 +7,12 @@ import java.io.PrintWriter;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.InputMismatchException;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
-
-import components.utilities.FormatChecker;
 
 /**
  * Generators an html and css tag cloud from an input text file.
@@ -39,15 +38,6 @@ public final class TagCloudGeneratorJCF {
      * Determinant of minimum/maximum font size.
      */
     private static final int FONTBUFFER = 10;
-
-    /**
-     * Constants to error check for .html and .txt tags.
-     */
-    private static final int DOTTXT = 4;
-    /**
-     * Constants to error check for .html and .txt tags.
-     */
-    private static final int DOTHTML = 5;
 
     /**
      * A class which compares two strings alphabetically using the Comparator
@@ -118,6 +108,7 @@ public final class TagCloudGeneratorJCF {
 
         Map<String, Integer> m = new HashMap<>();
         String line = in.readLine();
+
         while (line != null) {
 
             for (int i = 0; i < line.length(); i++) {
@@ -153,7 +144,7 @@ public final class TagCloudGeneratorJCF {
      * @throws IOException
      */
     private static void printHeader(PrintWriter output, String fileName,
-            int cloudSize) throws IOException {
+            int cloudSize) {
         output.println("<html>");
         output.write("<head>");
 
@@ -241,7 +232,7 @@ public final class TagCloudGeneratorJCF {
      *            the command line arguments
      * @throws IOException
      */
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         /*
          * 1. Ask user for input file, output file, number of words N to
          * display. 2. Parse words from input file. 3. Sort parsed words by
@@ -258,57 +249,110 @@ public final class TagCloudGeneratorJCF {
          */
         System.out.println("Enter path to input file name:");
         String input = in.nextLine();
+
+        BufferedReader inFile;
+        try {
+            inFile = new BufferedReader(new FileReader(input));
+
+        } catch (IOException e) {
+            System.err.println("Error opening input file.");
+            in.close();
+            return;
+        }
+
         System.out.println("Enter path to output file name:");
         String output = in.nextLine();
+        PrintWriter outFile;
+        try {
+            outFile = new PrintWriter(
+                    new BufferedWriter(new FileWriter(output)));
+        } catch (IOException e) {
+            try {
+                inFile.close();
+            } catch (IOException er) {
+                System.err.println("Error closing input file.");
+                in.close();
+                return;
+            }
+            System.err.println("Error opening output file.");
+            in.close();
+            return;
+        }
 
         System.out.println("Enter number of words to include in cloud:");
-        String number = in.nextLine();
-
-        if (true || FormatChecker.canParseInt(number)) {
-            int n = Integer.parseInt(number);
-            /*
-             * Checks for various invalid inputs.
-             */
-            BufferedReader inFile = new BufferedReader(new FileReader(input));
-
-            PrintWriter outFile = new PrintWriter(
-                    new BufferedWriter(new FileWriter(output)));
-
-            /*
-             * Parses words from input file after input is validated.
-             */
-            Set<Character> invalidChars = defineWord();
-            Map<String, Integer> words = countWords(inFile, invalidChars);
-
-            /*
-             * Sorts words by count in a sorting machine. IE puts map pairs into
-             * a sorting machine sorting by count.
-             */
-            Queue<Map.Entry<String, Integer>> sortByCount = new PriorityQueue<>(
-                    intcmp);
-            sortByCount.addAll(words.entrySet());
-
-            /*
-             * Sorts words by alphabet in a sorting machine. IE puts map pairs
-             * into a sorting machine sorting by word.
-             */
-            Queue<Map.Entry<String, Integer>> sortByWords = new PriorityQueue<>(
-                    strcmp);
-            for (int i = 0; i < n && sortByCount.size() > 0; i++) {
-                sortByWords.add(sortByCount.poll());
-            }
-
-            /*
-             * Constructs webpage.
-             */
-            printHeader(outFile, input, n);
-            printBody(outFile, sortByWords);
-
-            inFile.close();
+        int n;
+        try {
+            n = in.nextInt();
+        } catch (InputMismatchException error) {
+            System.err.println("Error: Expected integer, got non-integer.");
+            in.close();
             outFile.close();
-        } else {
-            System.out.print("Not a valid integer");
+            try {
+                inFile.close();
+            } catch (IOException er) {
+                System.err.println("Error closing input file.");
+                in.close();
+                return;
+            }
+            return;
         }
+
+        /*
+         * Parses words from input file after input is validated.
+         */
+        Set<Character> invalidChars = defineWord();
+
+        Map<String, Integer> words;
+
+        try {
+            words = countWords(inFile, invalidChars);
+        } catch (IOException e) {
+            System.err.println("Error reading from input file.");
+            in.close();
+            outFile.close();
+            try {
+                inFile.close();
+            } catch (IOException er) {
+                System.err.println("Error closing input file.");
+                in.close();
+                return;
+            }
+            return;
+        }
+
+        /*
+         * Sorts words by count in a sorting machine. IE puts map pairs into a
+         * sorting machine sorting by count.
+         */
+        Queue<Map.Entry<String, Integer>> sortByCount = new PriorityQueue<>(
+                intcmp);
+        sortByCount.addAll(words.entrySet());
+
+        /*
+         * Sorts words by alphabet in a sorting machine. IE puts map pairs into
+         * a sorting machine sorting by word.
+         */
+        Queue<Map.Entry<String, Integer>> sortByWords = new PriorityQueue<>(
+                strcmp);
+        for (int i = 0; i < n && sortByCount.size() > 0; i++) {
+            sortByWords.add(sortByCount.poll());
+        }
+
+        /*
+         * Constructs webpage.
+         */
+        printHeader(outFile, input, n);
+        printBody(outFile, sortByWords);
+
+        try {
+            inFile.close();
+
+        } catch (IOException e) {
+            System.err.println("Error closing input file.");
+            in.close();
+            return;
+        }
+        outFile.close();
 
         in.close();
 
